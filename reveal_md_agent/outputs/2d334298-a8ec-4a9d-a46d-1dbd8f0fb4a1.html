@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>My Awesome Presentation</title>
+
+		<link rel="stylesheet" href="/static/reveal.js/dist/reset.css">
+		<link rel="stylesheet" href="/static/reveal.js/dist/reveal.css">
+		<link rel="stylesheet" href="/static/reveal.js/dist/theme/black.css">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="/static/reveal.js/plugin/highlight/monokai.css">
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section data-markdown data-separator="^\n---\n$" data-separator-vertical="^\n--\n$">
+                    <textarea data-template>
+                        # 大模型处理大规模结构化数据
+
+---
+
+## 大规模Excel转为模型输入上下文的处理
+
+**一、自动化流程架构设计**
+
+整体流程围绕“模型输入需求”逆向设计，确保每一步处理都服务于“减少冗余、保留关键信息、适配模型理解习惯”的目标。核心架构分为4个模块：
+
+```
+Excel文件 → [数据解析模块] → [智能压缩模块] → [格式适配模块] → [模型交互接口] → 模型输出
+                                          ↑
+                                     人工配置（可选）
+```
+
+---
+
+### **二、各模块技术实现与工具选型**
+
+--
+
+### **1. 数据解析模块：批量接入与结构化提取**
+
+**目标**：自动读取Excel文件，解析表头、数据类型、公式依赖等，为后续处理提供基础信息。
+
+**技术实现**：
+
+- **工具**：Python（`pandas`+`openpyxl`）或低代码平台（如Alteryx、Power Automate）。
+- **核心功能**：
+    - **批量读取**：支持多Sheet、加密文件、超大Excel（通过`pandas`分块加载）。
+    - **元数据解析**：识别数值列/文本列/日期列，标记公式列（如`=SUM()`）并自动计算结果（避免模型处理公式）。
+    - **空值/异常值检测**：自动标记全空行、格式错误单元格（如文本型数值），后续优先过滤。
+
+--
+
+### **2. 智能压缩模块：按需筛选与信息提炼（压缩信息但保留价值）**
+
+**目标**：根据模型任务类型（如分析/总结/推理），自动筛选关键数据并压缩，核心是“保留对任务有用的信息”。
+
+**技术实现**：
+
+- **规则引擎+大模型辅助**：
+    - **预设规则**：针对通用场景（如销售分析、用户反馈）定义筛选逻辑（例：保留“销量&gt;均值2倍”的异常行，聚合“按周”的时间序列）。
+    - **动态适配**：用轻量模型（如GPT-3.5-turbo）分析用户任务（如“帮我总结Excel中的成本异常”），生成临时筛选规则（如“提取成本列中&gt;90%分位数的行”）。
+- **压缩策略**：
+    - 数值型：自动计算统计量（均值/极值/占比），替代明细行。
+    - 文本型：提取关键词（如“投诉原因”列用`TF-IDF`提取高频词）或生成短句摘要。
+    - 表格型：转换为“关键结论+数据支撑”的文本（例：“产品A成本最高（50元），是均值的2倍，主要来自原材料涨价”）。
+
+--
+
+### **3. 格式适配模块：贴合模型输入习惯**
+
+**目标**：将压缩后的数据转换为模型易理解的格式，减少解析负担，提升处理效率。
+
+**技术实现**：
+
+- **结构化文本生成**：
+    - 避免原始表格/JSON格式，改用“层级化自然语言”（如标题+列表），例：
+        
+        ```
+        核心指标：
+        - 总销量：10000件（环比+10%）
+        - 异常数据：产品B在2023-10销量骤降50%（原因为库存不足）
+        
+        分类统计：
+        - 华东地区：占比40%（最高）
+        - 产品A：利润贡献60%
+        
+        ```
+        
+    - 对长文本（如用户评论），用`Markdown`列表突出关键词（如`高频反馈：包装破损（30次）、物流慢（25次）`）。
+- **长度控制**：根据模型上下文窗口（如GPT-4支持8k/16k token）自动截断次要信息，优先保留“结论+关键数据点”。
+
+--
+
+### **4. 模型交互接口：无缝对接输入输出**
+
+**目标**：将处理后的内容作为模型输入，同时接收输出结果，形成闭环。
+
+**技术实现**：
+
+- **API封装**：调用大模型API（如OpenAI API、国产模型API）时，将压缩后的文本作为`prompt`的一部分
+- **反馈优化**：若模型输出不符合预期（如遗漏关键信息），自动触发“二次压缩”（如补充被截断的细节），迭代优化输入。
+
+---
+
+### **三、落地关键：贴合模型输入输出的细节设计**
+
+1. **与模型能力对齐**：
+    - 对擅长逻辑推理的模型（如GPT-4），保留更多结构化关系（如“产品A成本=原材料B+加工费C”）。
+    - 对长文本能力弱的模型（如部分7B小模型），进一步压缩至500字以内，聚焦单一结论。
+
+--
+
+2. **融入模型交互流程**：
+    - 处理后的输入需包含“任务指令+压缩数据”，符合模型“指令-响应”的习惯（例：“请分析以下销售数据，找出利润下降的原因：[压缩内容]”）。
+    - 若模型输出需要引用原始数据，在压缩时保留“数据来源标记”（如“详见Excel Sheet2的A10行”），便于人工核对。
+
+--
+
+3. **自动化配置界面**：
+    - 提供简单UI让用户选择“任务类型”（分析/总结/对比）、“压缩强度”（保留细节/仅保留结论），无需懂技术即可调整流程。
+
+---
+
+### **四、智能工场融合与部署方案**
+
+- 构建**python在线服务**或制作**垂直场景agent**，可供第三方接入
+
+--
+
+- 智能工厂
+    - 业务编排：增加**文件输入选项**，支持对文件变量做预处理
+    - agent：增加**文件预处理**功能，并记入模型记忆，多轮对话配合配套MCP工具再处理
+    - 多agent：增加**agent固定模版**
+                    </textarea>
+                </section>
+			</div>
+		</div>
+
+		<script src="/static/reveal.js/dist/reveal.js"></script>
+		<script src="/static/reveal.js/plugin/markdown/markdown.js"></script>
+		<script src="/static/reveal.js/plugin/highlight/highlight.js"></script>
+		<script src="/static/reveal.js/plugin/notes/notes.js"></script>
+
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+                width: 1920,
+				height: 1080,
+
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>

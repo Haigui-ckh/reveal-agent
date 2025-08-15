@@ -1,0 +1,29 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Markdown to Reveal.js</title>
+        <style>
+            body { font-family: sans-serif; margin: 40px; }
+            textarea { width: 100%; height: 200px; }
+        </style>
+    </head>
+    <body>
+        <h1>Markdown to Reveal.js Converter</h1>
+        <form action="/generate/" method="post" enctype="multipart/form-data">
+            <label for="title">Presentation Title:</label><br>
+            <input type="text" id="title" name="title" value="My Awesome Presentation"><br><br>
+            
+            <label for="markdown_text">Enter Markdown Text:</label><br>
+            <textarea id="markdown_text" name="markdown_text"></textarea><br><br>
+            
+            <p><strong>OR</strong></p>
+            
+            <label for="markdown_file">Upload Markdown File:</label><br>
+            <input type="file" id="markdown_file" name="markdown_file"><br><br>
+            
+            <input type="submit" value="Generate Presentation">
+        </form>
+    </body>
+    </html>
+    
