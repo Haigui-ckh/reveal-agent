@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+langchain
+langgraph
+langchain_openai
+markdown2
+pyppeteer
+python-dotenv
+jinja2
