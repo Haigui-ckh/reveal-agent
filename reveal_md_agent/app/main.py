@@ -46,46 +46,150 @@ class GraphState(TypedDict):
 def process_markdown(state: GraphState) -> GraphState:
     """Processes and structures the input markdown content using an LLM."""
     print("---CALLING LLM TO STRUCTURE MARKDOWN---")
+    
+    # 输出原始内容，用于调试
+    print("\n===== ORIGINAL MARKDOWN CONTENT =====")
+    print(state["markdown_content"])
+    print("===== END ORIGINAL CONTENT =====\n")
 
     # Check for API Key
     if not os.getenv("OPENAI_API_KEY"):
         print("---WARNING: OPENAI_API_KEY not found. Skipping LLM structuring.---")
-        structured_markdown = state["markdown_content"]
+        # 直接添加分隔符处理，不依赖LLM
+        content = state["markdown_content"]
+        
+        # 检查内容是否已经包含分隔符
+        if "---" not in content and "--" not in content:
+            # 如果没有分隔符，根据标题自动添加
+            lines = content.split('\n')
+            processed_lines = []
+            
+            for line in lines:
+                # 对于主标题（# 开头），添加水平分隔符
+                if line.strip().startswith('# '):
+                    if processed_lines and not processed_lines[-1].strip() == '---':
+                        processed_lines.append('---')
+                    processed_lines.append(line)
+                # 对于二级标题（## 开头），添加垂直分隔符
+                elif line.strip().startswith('## '):
+                    if processed_lines and not processed_lines[-1].strip() == '--':
+                        processed_lines.append('--')
+                    processed_lines.append(line)
+                else:
+                    processed_lines.append(line)
+            
+            # 确保开头有分隔符
+            if processed_lines and not processed_lines[0].strip() == '---':
+                processed_lines.insert(0, '---')
+                
+            structured_markdown = '\n'.join(processed_lines)
+        else:
+            # 已有分隔符，保持原样
+            structured_markdown = content
     else:
         try:
             llm = ChatOpenAI(model="deepseek-chat", temperature=0, base_url="https://api.deepseek.com")
             prompt_template = ChatPromptTemplate.from_messages([
-                ("system", "You are an expert in creating presentations. Your task is to structure raw markdown content for reveal.js slides. You must insert slide separators: '---' on a new line for new horizontal slides (main topics), and '--' on a new line for new vertical slides (sub-points of a main topic). Analyze the content's logical structure (headings, lists, paragraphs) to decide where to place the separators. Ensure the output is only the modified markdown content, without any additional explanations."),
-                ("user", "Please structure the following markdown content:\n\n{markdown_input}")
+                ("system", """You are an expert in creating presentations. Your task is to structure raw markdown content for reveal.js slides.
+
+IMPORTANT FORMATTING RULES:
+1. Insert '---' on its own line to create a new horizontal slide (main topic)
+2. Insert '--' on its own line to create a new vertical slide (sub-point of the current main topic)
+3. Use headings (# for main topics, ## for subtopics) to structure content
+4. Each slide should have a clear heading and concise content
+5. Group related content into vertical slides under the same main topic
+6. Ensure proper spacing - each separator must be on its own line with no extra spaces
+7. DO NOT add any explanatory text or comments - output ONLY the formatted markdown
+
+Analyze the content's logical structure (headings, lists, paragraphs) to decide where to place the separators.
+Your output must be ONLY the modified markdown content with proper slide separators."""),
+                ("user", "Please structure the following markdown content for a reveal.js presentation:\n\n{markdown_input}")
             ])
             parser = StrOutputParser()
             chain = prompt_template | llm | parser
             structured_markdown = chain.invoke({"markdown_input": state["markdown_content"]})
+            
+            # 输出模型生成的内容，用于调试
+            print("\n===== MODEL GENERATED CONTENT =====")
+            print(structured_markdown)
+            print("===== END MODEL GENERATED CONTENT =====\n")
+            
+            # 确保分隔符格式正确
+            structured_markdown = structured_markdown.replace("\n\n---\n\n", "\n---\n")
+            structured_markdown = structured_markdown.replace("\n\n--\n\n", "\n--\n")
+            
+            # 确保每个分隔符都是单独一行
+            lines = structured_markdown.split('\n')
+            for i in range(len(lines)):
+                if lines[i].strip() == '---' or lines[i].strip() == '--':
+                    lines[i] = lines[i].strip()
+            structured_markdown = '\n'.join(lines)
+            
+            print("---LLM PROCESSING COMPLETED SUCCESSFULLY---")
         except Exception as e:
             print(f"---ERROR during LLM call: {e}. Falling back to original content.---")
-            structured_markdown = state["markdown_content"]
-
-    return {
-        "markdown_content": structured_markdown,
-        "title": state.get("title", "My Presentation"),
-        "presentation_id": str(uuid.uuid4())
-    }
+            # 出错时使用基于规则的处理方法
+            content = state["markdown_content"]
+            
+            # 检查内容是否已经包含分隔符
+            if "---" not in content and "--" not in content:
+                # 如果没有分隔符，根据标题自动添加
+                lines = content.split('\n')
+                processed_lines = []
+                
+                for line in lines:
+                    # 对于主标题（# 开头），添加水平分隔符
+                    if line.strip().startswith('# '):
+                        if processed_lines and not processed_lines[-1].strip() == '---':
+                            processed_lines.append('---')
+                        processed_lines.append(line)
+                    # 对于二级标题（## 开头），添加垂直分隔符
+                    elif line.strip().startswith('## '):
+                        if processed_lines and not processed_lines[-1].strip() == '--':
+                            processed_lines.append('--')
+                        processed_lines.append(line)
+                    else:
+                        processed_lines.append(line)
+                
+                # 确保开头有分隔符
+                if processed_lines and not processed_lines[0].strip() == '---':
+                    processed_lines.insert(0, '---')
+                    
+                structured_markdown = '\n'.join(processed_lines)
+            else:
+                # 已有分隔符，保持原样
+                structured_markdown = content
+    
+    # 输出最终处理后的内容，用于调试
+    print("\n===== FINAL PROCESSED CONTENT =====")
+    print(structured_markdown)
+    print("===== END FINAL PROCESSED CONTENT =====\n")
+    
+    print("---MARKDOWN PROCESSING COMPLETED SUCCESSFULLY---")
+    
+    # 更新状态
+    state["markdown_content"] = structured_markdown
+    return state
 
 def generate_html(state: GraphState) -> GraphState:
     """Generates the reveal.js HTML file from markdown."""
     print("---GENERATING HTML---")
-    presentation_id = state["presentation_id"]
+    # 生成唯一ID
+    presentation_id = str(uuid.uuid4())
     template = templates.get_template("index.html")
     html_content = template.render(
-        title=state["title"],
+        title=state.get("title", "My Presentation"),
         content=state["markdown_content"]
     )
     
     output_path = os.path.join(OUTPUTS_DIR, f"{presentation_id}.html")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html_content)
-        
-    return {"output_html_path": output_path}
+    
+    # 更新状态
+    state["presentation_id"] = presentation_id
+    state["output_html_path"] = output_path
+    return state
 
 # --- LangGraph Workflow ---
 workflow = StateGraph(GraphState)
