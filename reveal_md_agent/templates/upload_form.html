@@ -1,29 +1,250 @@
 
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Markdown to Reveal.js</title>
-        <style>
-            body { font-family: sans-serif; margin: 40px; }
-            textarea { width: 100%; height: 200px; }
-        </style>
-    </head>
-    <body>
-        <h1>Markdown to Reveal.js Converter</h1>
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 幻灯片生成器</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --background-color: #f8f9fa;
+            --card-color: #ffffff;
+            --text-color: #333333;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            width: 90%;
+            max-width: 800px;
+            padding: 2rem;
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            resize: vertical;
+            transition: var(--transition);
+        }
+        
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            background-color: white;
+            transition: var(--transition);
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 8.825L1.175 4 2.05 3.125 6 7.075 9.95 3.125 10.825 4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 12px;
+            cursor: pointer;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+            color: #777;
+        }
+        
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background-color: #ddd;
+        }
+        
+        .divider span {
+            padding: 0 1rem;
+            font-weight: 600;
+        }
+        
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #f1f1f1;
+            border: 1px dashed #ccc;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .file-upload-label:hover {
+            background-color: #e9e9e9;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 100%;
+        }
+        
+        .btn:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Markdown 幻灯片生成器</h1>
         <form action="/generate/" method="post" enctype="multipart/form-data">
-            <label for="title">Presentation Title:</label><br>
-            <input type="text" id="title" name="title" value="My Awesome Presentation"><br><br>
+            <div class="form-group">
+                <label for="title">演示标题</label>
+                <input type="text" id="title" name="title" value="我的精彩演示" placeholder="输入您的演示标题">
+            </div>
             
-            <label for="markdown_text">Enter Markdown Text:</label><br>
-            <textarea id="markdown_text" name="markdown_text"></textarea><br><br>
+            <div class="form-group">
+                <label for="markdown_text">输入 Markdown 内容</label>
+                <textarea id="markdown_text" name="markdown_text" placeholder="在此输入您的 Markdown 内容..."></textarea>
+            </div>
             
-            <p><strong>OR</strong></p>
+            <div class="divider">
+                <span>或者</span>
+            </div>
             
-            <label for="markdown_file">Upload Markdown File:</label><br>
-            <input type="file" id="markdown_file" name="markdown_file"><br><br>
+            <div class="form-group">
+                <div class="file-upload">
+                    <label for="markdown_file" class="file-upload-label">
+                        选择 Markdown 文件上传
+                    </label>
+                    <input type="file" id="markdown_file" name="markdown_file" accept=".md,.markdown,.txt">
+                </div>
+            </div>
             
-            <input type="submit" value="Generate Presentation">
+            <div class="form-group">
+                <label for="theme">选择演示主题</label>
+                <select id="theme" name="theme" class="form-control">
+                    <option value="black" selected>黑色 (默认)</option>
+                    <option value="white">白色</option>
+                    <option value="league">League</option>
+                    <option value="beige">米色</option>
+                    <option value="sky">天空蓝</option>
+                    <option value="night">夜晚</option>
+                    <option value="serif">衬线字体</option>
+                    <option value="simple">简约</option>
+                    <option value="solarized">Solarized</option>
+                    <option value="blood">血色</option>
+                    <option value="moon">月亮</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn">生成演示幻灯片</button>
         </form>
-    </body>
-    </html>
+        
+        <div class="footer">
+            基于 Reveal.js 构建的 Markdown 幻灯片生成工具
+        </div>
+    </div>
+    
+    <script>
+        // 显示所选文件名
+        document.getElementById('markdown_file').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : '选择 Markdown 文件上传';
+            document.querySelector('.file-upload-label').textContent = fileName;
+        });
+    </script>
+</body>
+</html>
+    
     
