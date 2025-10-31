@@ -45,50 +45,49 @@ class GraphState(TypedDict):
     output_pdf_path: Optional[str] = None
     html_content: Optional[str] = None
 
+# --- Rule-based markdown processing ---
+def rule_structure_markdown(content: str) -> str:
+    """Structure markdown by inserting reveal.js separators based on headings.
+
+    - Insert '---' before top-level sections starting with '# '
+    - Insert '--' before sub-sections starting with '## '
+    - Keep existing separators
+    - Ensure first line is a horizontal separator
+    """
+    # If content already contains separators, return as-is
+    if "---" in content or "--" in content:
+        return content
+
+    lines = content.split('\n')
+    processed_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('# '):
+            if processed_lines and processed_lines[-1].strip() != '---':
+                processed_lines.append('---')
+            processed_lines.append(line)
+        elif stripped.startswith('## '):
+            if processed_lines and processed_lines[-1].strip() != '--':
+                processed_lines.append('--')
+            processed_lines.append(line)
+        else:
+            processed_lines.append(line)
+
+    if processed_lines and processed_lines[0].strip() != '---':
+        processed_lines.insert(0, '---')
+
+    return '\n'.join(processed_lines)
+
 # --- LangGraph Nodes ---
 def process_markdown(state: GraphState) -> GraphState:
     """Processes input markdown; with API key, request LLM to return full HTML."""
     print("---CALLING LLM TO STRUCTURE MARKDOWN---")
     
-    # 输出原始内容，用于调试
-    print("\n===== ORIGINAL MARKDOWN CONTENT =====")
-    print(state["markdown_content"])
-    print("===== END ORIGINAL CONTENT =====\n")
-
     # Check for API Key
     if not os.getenv("OPENAI_API_KEY"):
         print("---WARNING: OPENAI_API_KEY not found. Skipping LLM structuring.---")
-        # 直接添加分隔符处理，不依赖LLM
-        content = state["markdown_content"]
-        
-        # 检查内容是否已经包含分隔符
-        if "---" not in content and "--" not in content:
-            # 如果没有分隔符，根据标题自动添加
-            lines = content.split('\n')
-            processed_lines = []
-            
-            for line in lines:
-                # 对于主标题（# 开头），添加水平分隔符
-                if line.strip().startswith('# '):
-                    if processed_lines and not processed_lines[-1].strip() == '---':
-                        processed_lines.append('---')
-                    processed_lines.append(line)
-                # 对于二级标题（## 开头），添加垂直分隔符
-                elif line.strip().startswith('## '):
-                    if processed_lines and not processed_lines[-1].strip() == '--':
-                        processed_lines.append('--')
-                    processed_lines.append(line)
-                else:
-                    processed_lines.append(line)
-            
-            # 确保开头有分隔符
-            if processed_lines and not processed_lines[0].strip() == '---':
-                processed_lines.insert(0, '---')
-                
-            structured_markdown = '\n'.join(processed_lines)
-        else:
-            # 已有分隔符，保持原样
-            structured_markdown = content
+        structured_markdown = rule_structure_markdown(state["markdown_content"])
     else:
         try:
             llm = ChatOpenAI(model="deepseek-chat", temperature=0, base_url="https://api.deepseek.com")
@@ -108,8 +107,6 @@ def process_markdown(state: GraphState) -> GraphState:
                     index_html = tf.read()
             except Exception:
                 index_html = ""
-            print(f"---index_html content preview: {index_html[:1000]}... (truncated) ...---")
-            print(f"---prompt_text content preview: {prompt_text}... (truncated) ...---")
             # 不在系统消息中直接替换 HTML，以免触发 {} 为格式化变量的误解析
             prompt_template = ChatPromptTemplate.from_messages([
                 ("system", prompt_text),
@@ -125,56 +122,17 @@ def process_markdown(state: GraphState) -> GraphState:
                 "index_html": index_html,
             })
             
-            # 输出模型生成的内容，用于调试
-            print("\n===== MODEL GENERATED FULL HTML =====")
-            print(full_html[:1000])
-            print("... (truncated) ...")
-            print("===== END MODEL GENERATED FULL HTML =====\n")
-
             print("---LLM FULL HTML GENERATION COMPLETED SUCCESSFULLY---")
             state["html_content"] = full_html
         except Exception as e:
             print(f"---ERROR during LLM call: {e}. Falling back to original content.---")
             # 出错时使用基于规则的处理方法
-            content = state["markdown_content"]
-            
-            # 检查内容是否已经包含分隔符
-            if "---" not in content and "--" not in content:
-                # 如果没有分隔符，根据标题自动添加
-                lines = content.split('\n')
-                processed_lines = []
-                
-                for line in lines:
-                    # 对于主标题（# 开头），添加水平分隔符
-                    if line.strip().startswith('# '):
-                        if processed_lines and not processed_lines[-1].strip() == '---':
-                            processed_lines.append('---')
-                        processed_lines.append(line)
-                    # 对于二级标题（## 开头），添加垂直分隔符
-                    elif line.strip().startswith('## '):
-                        if processed_lines and not processed_lines[-1].strip() == '--':
-                            processed_lines.append('--')
-                        processed_lines.append(line)
-                    else:
-                        processed_lines.append(line)
-                
-                # 确保开头有分隔符
-                if processed_lines and not processed_lines[0].strip() == '---':
-                    processed_lines.insert(0, '---')
-                    
-                structured_markdown = '\n'.join(processed_lines)
-            else:
-                # 已有分隔符，保持原样
-                structured_markdown = content
+            structured_markdown = rule_structure_markdown(state["markdown_content"])
     
     # 输出最终处理后的内容（若为LLM HTML则略）
     if state.get("html_content"):
         print("---HTML mode active, skipping markdown debug output---")
     else:
-        print("\n===== FINAL PROCESSED MARKDOWN =====")
-        print(structured_markdown)
-        print("===== END FINAL PROCESSED MARKDOWN =====\n")
-        print("---MARKDOWN PROCESSING COMPLETED SUCCESSFULLY---")
         state["markdown_content"] = structured_markdown
     return state
 

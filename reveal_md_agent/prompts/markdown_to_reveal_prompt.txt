@@ -29,8 +29,10 @@ Animation rules
   - When consecutive slides show progressive changes of related elements, add `data-auto-animate` to both.
   - Ensure morphable elements share identifiers via `data-id` (e.g., `<div data-id="hero">...</div>`, `<pre data-id="example">...</pre>`).
   - You may set reasonable defaults for auto-animate (easing/duration) but do not remove existing initialization.
-- Fragments:
-  - For bulleted points or stepwise emphasis, wrap items with `class="fragment"` and optionally `data-fragment-index`.
+– Fragments:
+  - Lists should animate markers (bullets or numerals) together with text. Use HTML lists `<ul>/<ol>` and apply fragments on the list item element: `<li class="fragment" data-fragment-index="...">...`.
+  - Avoid wrapping only inner text with `<span class="fragment">` for list items, because ordered list numerals will not animate; prefer `<li class="fragment">`.
+  - For non-list stepwise emphasis, you may use `<span class="fragment">` wrappers.
   - For code narration, split highlights into multiple fragments or use line-by-line reveal.
 - Code blocks:
   - Use fenced code blocks when staying in Markdown, or `<pre><code>` in HTML.
